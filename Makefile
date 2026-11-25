@@ -1,44 +1,55 @@
-# Builds every lab program into its own .elf and .bin
-#
-#   make                         build all
-#   make OPENCM3_DIR=/path/to/libopencm3
-#   make flash P=set1/s1_q3a_blink     flash one program with st-flash
-#
-# Needs: arm-none-eabi-gcc, libopencm3 built with `make TARGETS=stm32/f1`
-
-#OPENCM3_DIR ?= ../libopencm3
+# STM32F103C8T6 / libopencm3 / ST-Link
+.DEFAULT_GOAL := all
 OPENCM3_DIR ?= /home/arghya/MCA/stm32/stm32f103c8t6/libopencm3
-PREFIX      ?= arm-none-eabi-
-
-CC      = $(PREFIX)gcc
+PREFIX ?= arm-none-eabi-
+CC = $(PREFIX)gcc
 OBJCOPY = $(PREFIX)objcopy
-SIZE    = $(PREFIX)size
+SIZE = $(PREFIX)size
+STFLASH ?= st-flash
+ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+LDSCRIPT := $(ROOT)bluepill.ld
+LIB := $(OPENCM3_DIR)/lib/libopencm3_stm32f1.a
+ARCH := -mcpu=cortex-m3 -mthumb -msoft-float
+CFLAGS := $(ARCH) -Os -g -std=c99 -Wall -Wextra -DSTM32F1 -I$(OPENCM3_DIR)/include -ffunction-sections -fdata-sections
+LDFLAGS := $(ARCH) -nostartfiles --specs=nano.specs --specs=nosys.specs -L$(OPENCM3_DIR)/lib -L$(OPENCM3_DIR)/lib/stm32/f1 -T$(LDSCRIPT) -Wl,--gc-sections
+# Each C file is a separate lab program, not a module of a larger program.
+ifeq ($(abspath $(CURDIR)),$(abspath $(ROOT)))
+SRCS := $(wildcard */*.c)
+else
+SRCS := $(wildcard *.c)
+endif
+ELFS := $(SRCS:.c=.elf)
+BINS := $(SRCS:.c=.bin)
+P ?= $(if $(filter 1,$(words $(SRCS))),$(basename $(SRCS)))
 
-ARCH    = -mcpu=cortex-m3 -mthumb -msoft-float
-CFLAGS  = $(ARCH) -Os -g -std=c99 -Wall -Wextra -DSTM32F1 \
-          -I$(OPENCM3_DIR)/include -ffunction-sections -fdata-sections
-LDFLAGS = $(ARCH) -nostartfiles --specs=nano.specs --specs=nosys.specs \
-          -Tbluepill.ld -L$(OPENCM3_DIR)/lib -Wl,--gc-sections
-LDLIBS  = -lopencm3_stm32f1
-
-SRCS = $(wildcard set1/*.c set2/*.c adc/*.c)
-ELFS = $(SRCS:.c=.elf)
-BINS = $(SRCS:.c=.bin)
-
+.PHONY: all elf bin flash clean clobber
 all: $(BINS)
+elf: $(ELFS)
+bin: $(BINS)
 
-%.elf: %.c bluepill.ld
-	$(CC) $(CFLAGS) $(LDFLAGS) $< $(LDLIBS) -o $@
-	@$(SIZE) $@ | tail -1
+%.elf: %.c $(LDSCRIPT) $(ROOT)Makefile $(LIB)
+	$(CC) $(CFLAGS) $(LDFLAGS) $< -lopencm3_stm32f1 -o $@
+	$(SIZE) $@
+
+$(LIB):
+	@echo 'Missing libopencm3 STM32F1 library. Build it with:' >&2
+	@echo 'make -C $(OPENCM3_DIR) TARGETS=stm32/f1' >&2
+	@exit 1
 
 %.bin: %.elf
 	$(OBJCOPY) -O binary $< $@
 
+ifneq ($(strip $(P)),)
 flash: $(P).bin
-	st-flash --reset write $(P).bin 0x08000000
+	$(STFLASH) --reset write $(P).bin 0x08000000
+else
+flash:
+	@echo 'Select a program: make flash P=path/to/program (without .c)' >&2
+	@echo 'Available programs: $(basename $(SRCS))' >&2
+	@exit 1
+endif
 
-clean:
-	rm -f */*.elf */*.bin
+clean clobber:
+	rm -f $(ELFS) $(BINS) $(SRCS:.c=.o)
 
-.PHONY: all flash clean
 .PRECIOUS: %.elf

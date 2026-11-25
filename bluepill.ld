@@ -1,10 +1,7 @@
-/* Linker script for STM32F103C8T6 (Blue Pill).
- * Tells the linker where Flash and RAM are; libopencm3's generic
- * script does the rest (vector table, .text, .data, .bss, stack). */
+/* STM32F103C8T6: 64 KiB flash, 20 KiB SRAM. */
 MEMORY
 {
     rom (rx)  : ORIGIN = 0x08000000, LENGTH = 64K
     ram (rwx) : ORIGIN = 0x20000000, LENGTH = 20K
 }
-
 INCLUDE cortex-m-generic.ld
