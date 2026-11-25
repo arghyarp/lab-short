@@ -1,13 +1,13 @@
 # STM32F103C8T6 / libopencm3 / ST-Link
 .DEFAULT_GOAL := all
-OPENCM3_DIR ?= /home/arghya/MCA/stm32/stm32f103c8t6/libopencm3
 PREFIX ?= arm-none-eabi-
 CC = $(PREFIX)gcc
 OBJCOPY = $(PREFIX)objcopy
 SIZE = $(PREFIX)size
 STFLASH ?= st-flash
 ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-LDSCRIPT := $(ROOT)bluepill.ld
+OPENCM3_DIR ?= $(ROOT)libopencm3
+LDSCRIPT ?= $(ROOT)stm32f103c8t6.ld
 LIB := $(OPENCM3_DIR)/lib/libopencm3_stm32f1.a
 ARCH := -mcpu=cortex-m3 -mthumb -msoft-float
 CFLAGS := $(ARCH) -Os -g -std=c99 -Wall -Wextra -DSTM32F1 -I$(OPENCM3_DIR)/include -ffunction-sections -fdata-sections
